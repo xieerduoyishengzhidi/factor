@@ -1,0 +1,492 @@
+好，先不碰 backtrader，我们先把**“因子研究 + 策略回测”工程版 V1 需求文档**写出来，方便你和 Codex 一起边写边迭代。
+
+下面就是可以直接放进你项目里的《需求说明文档》（比如：`docs/requirements_v1.md`）。
+
+---
+
+# 量化因子研究与回测框架 V1 需求文档
+
+## 1. 项目目标与范围
+
+### 1.1 目标
+
+构建一个用于 **可转债/股票横截面因子研究** 的 Python 工程，支持：
+
+1. **因子构建**
+2. **因子预处理**（去极值、标准化、中性化）
+3. **因子评估**
+
+   * 日度 / 月度 / 年度 IC
+   * 因子收益回归（factor return）
+   * 分层回测（分组收益曲线）
+   * 换手率分析
+4. **简单策略构建与回测**（基于因子打分的轮动策略）
+5. **结果输出与可视化**（图表 + 表格 + 简单报告）
+
+该框架优先满足 **研究/实验需求**，不考虑撮合细节和高频下单逻辑（暂不接入 backtrader）。
+
+---
+
+### 1.2 非目标（暂不实现）
+
+* 不做事件驱动、逐 K 线撮合（这类交给以后 backtrader 等框架）。
+* 不做分钟级/tick 级回测，全流程以 **日频数据** 为主。
+* 不做交易成本复杂建模（先支持简易费率/滑点即可）。
+* 不做实盘交易接口（如券商 API）。
+
+---
+
+## 2. 总体架构与数据流
+
+### 2.1 核心数据流（逻辑顺序）
+
+1. **数据加载 & 预处理**
+
+   * 从 parquet/csv 读取原始转债/股票数据
+   * 清洗、对齐交易日，处理停牌/缺失
+
+2. **因子构建（以双低因子为例）**
+
+   * 输入：收盘价、转股价、正股价格、基本信息
+   * 输出：因子矩阵 DataFrame（index=日期，columns=code）
+
+3. **因子预处理**
+
+   * 去极值（Winsorize）
+   * Zscore 标准化
+   * （可选）行业/规模中性化
+
+4. **因子评估**
+
+   * 计算日度 IC、月度 IC、年度 IC、ICIR
+   * 计算因子收益（横截面回归得到 β）
+   * 分层回测（分组净值曲线）
+   * 换手率分析
+
+5. **基于因子的简单策略**
+
+   * 选最优 N% 标的构建多头组合
+   * 等权持有、定期调仓
+   * 输出资金曲线、收益指标
+
+6. **结果与报告**
+
+   * 把各类指标、图表写入 `data/results/` 目录
+   * 可选：自动生成 markdown/PDF 报告
+
+---
+
+## 3. 目录结构（V1 版本）
+
+```text
+quant_factor_project/
+│
+├── data/
+│   ├── raw/                     # 原始数据（外部导入，工程内只读）
+│   ├── processed/               # 清洗 & 对齐后的数据
+│   ├── factors/                 # 各个因子计算后的结果（parquet）
+│   └── results/                 # 回测结果、图表、报告
+│
+├── config/
+│   ├── settings.yaml            # 全局配置（起止日期、路径、频率等）
+│   └── factor_list.yaml         # 因子注册列表（因子名 → 模块路径）
+│
+├── utils/
+│   ├── io.py                    # 读写 parquet/csv/yaml 的工具函数
+│   ├── log.py                   # 简单日志封装
+│   ├── calendar.py              # 交易日工具（下一个交易日、调仓日）
+│   └── plot.py                  # 通用画图函数（IC、净值、分层等）
+│
+├── preprocess/
+│   ├── load_data.py             # 从 data/raw 加载各类原始数据
+│   ├── align_data.py            # 统一对齐（date × code）面板数据
+│   └── clean_data.py            # 停牌、缺失值、异常值处理
+│
+├── factors/
+│   ├── base_factor.py           # 因子基类定义（接口约束）
+│   ├── double_low.py            # 双低因子实现
+│   └── (future other factors...)
+│
+├── factor_processing/
+│   ├── winsorize.py             # 截面去极值
+│   ├── standardize.py           # 截面标准化（Zscore）
+│   ├── neutralize.py            # 截面中性化（如对行业/规模）
+│   └── factor_pipeline.py       # 因子处理流水线（组合调用上面函数）
+│
+├── factor_evaluation/
+│   ├── ic_analysis.py           # 日/月/年 IC、ICIR 计算
+│   ├── factor_return_regression.py  # 横截面回归，得到因子收益序列
+│   ├── layer_backtest.py        # 分层回测（多空/多头）
+│   ├── turnover_analysis.py     # 分层组合换手率分析
+│   └── summary_report.py        # 汇总生成因子分析报告（可选）
+│
+├── strategy/
+│   ├── single_factor_strategy.py# 基于单因子打分的简单轮动策略
+│   └── position_sizing.py       # 根据打分/权重生成目标持仓
+│
+├── backtest/
+│   ├── engine.py                # 向量化回测引擎（日频）
+│   └── performance.py           # 绩效统计（收益、回撤、夏普等）
+│
+├── notebooks/
+│   ├── 01_build_double_low.ipynb    # 双低因子构建实验
+│   ├── 02_evaluate_double_low.ipynb # 双低因子评估实验
+│   └── 03_double_low_strategy.ipynb # 策略回测实验
+│
+└── main.py                      # 命令行入口：一键跑通全流程
+```
+
+---
+
+## 4. 模块与文件功能说明（给你和 Codex 的开发指引）
+
+### 4.1 `config/`
+
+#### `settings.yaml`
+
+* 主要内容：
+
+  * 数据起止日期：`start_date`, `end_date`
+  * 回测频率：`frequency = 'daily'`
+  * 中性化选择：`neutralize: ['industry', 'size']`
+  * 路径配置：各类数据/结果目录
+
+#### `factor_list.yaml`
+
+* 注册因子及其对应实现文件：
+
+  ```yaml
+  double_low:
+    module: "factors.double_low"
+    class: "DoubleLowFactor"
+  ```
+
+---
+
+### 4.2 `utils/`
+
+#### `io.py`
+
+* 功能：
+
+  * `read_parquet(path) -> pd.DataFrame`
+  * `save_parquet(df, path)`
+  * `read_yaml(path) -> dict`
+  * `save_pickle(obj, path)`
+
+#### `plot.py`
+
+* 功能：
+
+  * `plot_ic_series(ic_series, out_path)`
+  * `plot_cum_ic(ic_series, out_path)`
+  * `plot_nav(nav_series_dict, out_path)`  # 多条净值曲线
+  * `plot_layer_return(layer_nav_df, out_path)`  # 分层净值
+
+#### `calendar.py`
+
+* 功能：
+
+  * `get_trading_days(start, end) -> list[datetime]`
+  * `get_rebalance_days(freq='weekly') -> list[datetime]`
+
+---
+
+### 4.3 `preprocess/`
+
+#### `load_data.py`
+
+* 功能：
+  提供统一接口读入原始数据，如：
+
+  * 转债日线：`cbond_bar_1day`
+  * 转股价：`cbond_convert_price_adjust`
+  * 正股日线：`stock_bar_1day`
+  * 基本信息：`cbond_basic_info`
+
+* 主要函数：
+
+  ```python
+  def load_cbond_close() -> pd.DataFrame:
+      """返回 DataFrame，index=datetime, columns=cbond_code"""
+
+  def load_convert_price() -> pd.DataFrame:
+      """返回 DataFrame，index=datetime, columns=cbond_code"""
+
+  def load_stock_close(stock_codes: list) -> pd.DataFrame:
+      """返回 DataFrame，index=datetime, columns=stock_code"""
+  ```
+
+#### `align_data.py`
+
+* 功能：
+
+  * 多个数据源按日期、代码对齐，保证面板结构一致。
+* 输出：
+
+  * 标准格式：`index=datetime, columns=code` 的 DataFrame。
+
+#### `clean_data.py`
+
+* 功能：
+
+  * 停牌处理（收益置 0 或标记 NaN）
+  * 缺失值填充（ffill 或丢弃）
+  * 极端价格过滤（可选）
+
+---
+
+### 4.4 `factors/`
+
+#### `base_factor.py`
+
+* 定义因子基类，规范接口。
+
+```python
+class BaseFactor:
+    def __init__(self, config: dict):
+        self.config = config
+
+    def load_raw_data(self):
+        """加载该因子需要的原始数据"""
+
+    def compute(self) -> pd.DataFrame:
+        """
+        计算因子值
+        返回：DataFrame，index=datetime, columns=code
+        """
+```
+
+#### `double_low.py`
+
+* 实现“双低因子”的计算（对应你那段文章代码）。
+* 逻辑：
+
+  * 计算转股价值 `convert_value`
+  * 计算溢价率 `premium = close / convert_value - 1`
+  * 计算 double_low：`close + 100 * premium`
+  * 保存到 `data/factors/double_low.parquet`
+
+---
+
+### 4.5 `factor_processing/`
+
+#### `winsorize.py`
+
+* 函数：
+
+  ```python
+  def winsorize_cross_section(factor_df, lower_q=0.01, upper_q=0.99) -> pd.DataFrame:
+      """对每个截面按分位数去极值"""
+  ```
+
+#### `standardize.py`
+
+* 函数：
+
+  ```python
+  def zscore_cross_section(factor_df) -> pd.DataFrame:
+      """对每天截面做 Zscore 标准化"""
+  ```
+
+#### `neutralize.py`
+
+* 函数：
+
+  ```python
+  def neutralize_cross_section(factor_df, industry_df, size_df) -> pd.DataFrame:
+      """
+      对每个截面做回归中性化，得到残差因子。
+      factor ~ industry + size
+      """
+  ```
+
+#### `factor_pipeline.py`
+
+* 功能：组合上述步骤，生成最终可用的因子矩阵。
+* 主函数：
+
+  ```python
+  def process_factor(raw_factor_df, industry_df=None, size_df=None, config=None) -> pd.DataFrame:
+      """
+      1. 去极值
+      2. 标准化
+      3. 中性化（可选）
+      """
+  ```
+
+---
+
+### 4.6 `factor_evaluation/`
+
+#### `ic_analysis.py`
+
+* 功能：
+
+  * 计算日度 RankIC：`ic_daily`
+  * 计算月度 IC（对 ic_daily 按月平均）
+  * 计算年度 IC
+  * 计算 ICIR（mean / std）
+
+* 接口示例：
+
+  ```python
+  def calc_ic(factor_df, forward_return_df, method='spearman') -> pd.Series:
+      """返回每日 IC 序列，index=datetime"""
+
+  def aggregate_ic(ic_series, freq='M') -> pd.Series:
+      """按 freq 聚合为月度/年度 IC"""
+  ```
+
+#### `factor_return_regression.py`
+
+* 功能：
+
+  * 对每天做横截面回归：`r = a + b * factor`
+  * 得到因子收益序列 `b_t`，并可累积成 “因子净值”。
+
+#### `layer_backtest.py`
+
+* 功能：
+
+  * 将截面按因子排序分为 N 组（默认 5 组）。
+  * 计算每组组合的等权收益、净值。
+  * 输出：
+
+    * 每层日度收益矩阵
+    * 每层净值序列
+
+#### `turnover_analysis.py`
+
+* 功能：
+
+  * 计算各分组组合的换手率
+
+---
+
+### 4.7 `strategy/`
+
+#### `single_factor_strategy.py`
+
+* 功能：
+
+  * 基于某个因子（如双低），在每个调仓日选择 top N% 标的，构建等权多头组合。
+  * 输出：
+
+    * 每日持仓权重矩阵：`weights_df`（index=datetime, columns=code）
+
+#### `position_sizing.py`
+
+* 功能：
+
+  * 根据因子打分或层级，确定目标权重（可扩展为风险平价等）。
+
+---
+
+### 4.8 `backtest/`
+
+#### `engine.py`
+
+* 功能：
+
+  * 输入：
+
+    * 价格 DataFrame（收盘价）
+    * 权重 DataFrame（组合权重）
+  * 计算：
+
+    * 日度组合收益
+    * 资金曲线（净值）
+
+#### `performance.py`
+
+* 功能：
+
+  * 计算回测指标：
+
+    * 年化收益 / 波动率 / 夏普
+    * 最大回撤
+    * 胜率等
+
+---
+
+### 4.9 `notebooks/`
+
+* 主要是你实验、调试的场所，Codex 也可以在这里根据 Markdown 注释帮你写代码。
+
+---
+
+### 4.10 `main.py`
+
+* 目标：支持命令行一键跑完整流程，例如：
+
+```bash
+python main.py --factor double_low --run-all
+```
+
+大致流程：
+
+```python
+def main():
+    # 1. 读配置
+    # 2. 构建/加载因子
+    # 3. 因子预处理
+    # 4. 因子评估（IC、分层等）
+    # 5. 构建简单策略 & 回测
+    # 6. 输出结果和图表
+```
+
+---
+
+## 5. 数据格式与约定（给自己一个统一标准）
+
+1. **价格、因子、收益等矩阵统一格式：**
+
+```text
+index   = datetime（升序）
+columns = 代码（字符串，如 "113012.SZ"）
+values  = float
+```
+
+2. **收益定义：**
+
+```python
+forward_return_df = close_df.pct_change().shift(-1)
+# 即：当天因子预测“下一日收益”
+```
+
+3. **缺失值处理：**
+
+* 因子值 NaN：该标的当日不参与排序/分组。
+* 收益 NaN：不参与当日 IC 计算。
+
+---
+
+## 6. 开发协作建议（你 & Codex）
+
+* 所有公共函数写明确的 docstring：
+
+  * 参数类型
+  * 返回值类型
+  * 含义解释
+* 模块级文件顶部写一句话解释本文件作用。
+* 优先实现：
+
+  1. `preprocess/load_data.py`
+  2. `factors/double_low.py`
+  3. `factor_processing/factor_pipeline.py`
+  4. `factor_evaluation/ic_analysis.py`
+  5. `factor_evaluation/layer_backtest.py`
+
+这样你很快就能完整走完：
+
+> **双低因子 → 处理 → IC 分析 → 分层回测 → 策略雏形**
+
+---
+
+如果你愿意，下一步我可以：
+
+* 按这个需求文档，**帮你生成一套空目录 + 空文件 + 模板函数签名**，你直接丢给 Codex 让它帮你补实现；
+* 或者优先帮你把 `double_low.py + factor_pipeline.py + ic_analysis.py` 写成可运行的代码草稿。
+
+你更想先从哪块动手？
