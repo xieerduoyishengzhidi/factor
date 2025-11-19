@@ -15,8 +15,17 @@ turnover = pd.read_pickle(os.path.join(datapath,'TURNOVER.pkl'))
 daily_turnover_rate = pd.read_pickle(os.path.join(datapath,'DAILY_TURNOVER_RATE.pkl'))
 
 if __name__ == "__main__":
+    print(close.head())
+    print(high.head())
+    print(low.head())
+    print(open_price.head())
+    print(volume.head())
+    print(market_capitalization.head())
+    print(turnover.head())
+    print(daily_turnover_rate.head())
    
-   """  print(close.info())
+"""
+    print("close.info()")
     print(high.info())
     print(low.info())
     print(open_price.info())
@@ -36,46 +45,57 @@ if __name__ == "__main__":
 
 # 对同一个column，检查close和high,low,open_price,volume,market_capitalization,turnover,daily_turnover_rate是否同时存在缺失值
 # 检查每个col是否在所有DataFrame中都缺失，或者都不缺失，否则报错
-dataframes = [
-    close,
-    high,
-    low,
-    open_price,
-    volume,
-    market_capitalization,
-    turnover,
-    daily_turnover_rate
-]
 
-for col in close.columns:
-    # 检查所有表中，该col是否都完全缺失
-    is_missing = []
-    for df in dataframes:
-        # 如果df没有该col，认为该col全缺失
+dataframes = {
+    "close": close,
+    "high": high,
+    "low": low,
+    "open_price": open_price,
+    "volume": volume,
+    "market_capitalization": market_capitalization,
+    "turnover": turnover,
+    "daily_turnover_rate": daily_turnover_rate
+}
+
+# 所有出现过的列
+all_columns = set()
+for df in dataframes.values():
+    all_columns |= set(df.columns)
+
+# 记录每列的缺失数量
+missing_summary = {}
+
+for col in all_columns:
+    col_missing_info = {}  # 每个 df 中 col 的缺失情况
+
+    is_missing_list = []
+
+    for name, df in dataframes.items():
         if col not in df.columns:
-            is_missing.append(True)
+            col_missing_info[name] = "不存在"
+            is_missing_list.append(True)  # 当作全缺失处理
         else:
-            # 判断该列是否全是NA
-            is_missing.append(df[col].isnull().all())
-    # 如果is_missing全True或全False，认为一致，否则报列名及具体情况
-    if all(is_missing) or not any(is_missing):
-        print(f"列 {col} 在所有数据表中都缺失")
-        continue
+            missing_count = df[col].isna().sum()
+            col_missing_info[name] = missing_count
+            is_missing_list.append(missing_count == len(df))
+
+    missing_summary[col] = col_missing_info
+
+    # 判断缺失情况是否一致
+    if all(is_missing_list):
+        print(f"列 {col} 在所有表中都完全缺失")
+    elif not any(is_missing_list):
+        print(f"列 {col} 在所有表中都存在（无全缺失情况）")
     else:
-        print(f"列 {col} 在数据表中的缺失情况不一致：")
-        for df, miss in zip(
-            [
-                "close", "high", "low", "open_price",
-                "volume", "market_capitalization", "turnover", "daily_turnover_rate"
-            ], is_missing
-        ):
-            print(f" - {df}: {'全缺失' if miss else '有数据'}")
-        print("请检查该列！")
+        print(f"⚠ 列 {col} 缺失情况不一致：")
+        for name, info in col_missing_info.items():
+            print(f" - {name}: {info}")
+        print("请检查该列！\n")
 
+# 打印汇总表
+print("\n===== 缺失统计汇总 =====")
+print(pd.DataFrame(missing_summary).T)
 
-
-
-
-
+print(len(close.index))
 
 
