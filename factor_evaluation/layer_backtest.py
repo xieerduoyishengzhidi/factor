@@ -14,10 +14,12 @@ class LayerBacktester:
             try:
                 return pd.qcut(x, self.groups, labels=False, duplicates='drop')
             except ValueError:
-                return pd.Series(index=x.index, data=-1) # 樣本太少無法分組
+                return pd.Series(index=x.index, data=-1)
 
-        self.data['group'] = self.data.groupby(level='date')['factor'].apply(get_group)
-        
+        # self.data['group'] = self.data.groupby(level='date')['factor'].apply(get_group)
+        # self.data['group'] = self.data.groupby(level='date', group_keys=False)['factor'].apply(get_group)
+        raw_groups = self.data.groupby(level='date')['factor'].apply(get_group)
+        self.data['group'] = raw_groups.droplevel(0)
         # 過濾掉無法分組的日子
         valid_grouped = self.data[self.data['group'] != -1]
 

@@ -38,7 +38,7 @@ def main():
     )
     print(f"有效樣本數: {len(merged_data)}")
     print(merged_data.head())
-
+    """ 
     # 3. IC 分析
     print("\n[2/3] 正在進行 IC 分析...")
     ic_analyzer = ICAnalyzer(merged_data)
@@ -51,7 +51,8 @@ def main():
     print("-" * 30)
     
     # 畫圖
-    ic_analyzer.plot_ic()
+    ic_analyzer.plot_ic() 
+    """
 
     # 4. 分層回測
     print("\n[3/3] 正在進行分層回測 (N=5)...")
