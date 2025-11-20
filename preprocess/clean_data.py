@@ -59,15 +59,29 @@ def add_status_fields(panel: pd.DataFrame) -> pd.DataFrame:
 
     # 前向 close，只用于画图/资产估算
     df['close_ffill'] = (
-        df.groupby('code')['close']
+        df.groupby('code', group_keys=False)['close']
         .apply(lambda x: x.ffill())
     )
 
     # pct_chg: 优先当日涨跌幅
+    def compute_pct_chg(group):
+        close = group['close']
+        fill_close = group.get('close_ffill', None)
+        prev_close = close.shift(1)
+        pct_chg = close / prev_close - 1
+
+        # 找到：本日不为nan，昨日为nan的位置，且已上市，且未停牌
+        mask = close.notna() & prev_close.isna()&(group['listed'] == 1)&(group['suspended'] == 0)
+        if fill_close is not None:
+            prev_fill_close = fill_close.shift(1)
+            pct_chg[mask] = (close[mask] / prev_fill_close[mask] - 1).values
+        return pct_chg
+
     df['pct_chg'] = (
-        df.groupby('code')['close']
-        .apply(lambda x: x / x.shift(1) - 1)
+        df.groupby('code', group_keys=False)
+        .apply(compute_pct_chg)
     )
+
     # 停牌/未上市日无返回
     df.loc[df['listed'] == 0, 'pct_chg'] = np.nan
     df.loc[df['suspended'] == 1, 'pct_chg'] = np.nan
@@ -113,3 +127,13 @@ def add_status_fields(panel: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+if __name__ == "__main__":
+     panel = load_panel()
+     print(panel.head(100))
+     print(panel.info())
+     print(panel.isnull().sum())
+     panel = add_status_fields(panel)
+     panel.to_pickle(os.path.join(PROCESSED_PATH, 'panel_cleaned.pkl'))
+     print(panel.head(100))
+     print(panel.info())
+     print(panel.isnull().sum())

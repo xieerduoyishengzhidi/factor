@@ -84,14 +84,16 @@ def align_data(dfs: dict):
     # 拼成一个 (date, code) 的长表 panel
     panel = pd.concat(
         [
-            aligned["close"].stack().rename("close"),
-            aligned["high"].stack().rename("high"),
-            aligned["low"].stack().rename("low"),
-            aligned["open_price"].stack().rename("open_price"),
-            aligned["volume"].stack().rename("volume"),
-            aligned["market_capitalization"].stack().rename("market_capitalization"),
-            aligned["turnover"].stack().rename("turnover"),
-            aligned["daily_turnover_rate"].stack().rename("daily_turnover_rate"),
+            # 修改前：aligned["close"].stack().rename("close"),
+            # 修改後：加上 dropna=False
+            aligned["close"].stack(dropna=False).rename("close"),
+            aligned["high"].stack(dropna=False).rename("high"),
+            aligned["low"].stack(dropna=False).rename("low"),
+            aligned["open_price"].stack(dropna=False).rename("open_price"),
+            aligned["volume"].stack(dropna=False).rename("volume"),
+            aligned["market_capitalization"].stack(dropna=False).rename("market_capitalization"),
+            aligned["turnover"].stack(dropna=False).rename("turnover"),
+            aligned["daily_turnover_rate"].stack(dropna=False).rename("daily_turnover_rate"),
         ],
         axis=1
     )

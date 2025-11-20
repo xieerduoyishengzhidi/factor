@@ -99,9 +99,10 @@ if __name__ == "__main__":
             print("请检查该列！\n")
 
     # 打印汇总表
-    print("\n===== 缺失统计汇总 =====")
-    print(pd.DataFrame(missing_summary).T)
-
+    #print("\n===== 缺失统计汇总 =====")
+    #print(pd.DataFrame(missing_summary).T)
+    
+    
     print(len(close.index))
-    print(market_capitalization.head(20))
+    #print(market_capitalization.head(20))
 
