@@ -47,7 +47,7 @@ class BaseFactor(abc.ABC):
         self,
         name: str,
         lookback: int | None = None,      # 回看窗口（天）
-        lag: int = 1,                     # 滞后期，通常=1天
+        lag: int = 0,                     # 滞后期，通常=0天
         winsor_limit: float = 0.01,       # 去极值比例 (1% / 99%)
         do_winsor: bool = False,
         do_zscore: bool = False,           # 是否做横截面标准化

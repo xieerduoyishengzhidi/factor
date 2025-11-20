@@ -17,7 +17,7 @@ df = df.reindex(new_index)
 
 # 2. Instantiate the Factor
 # notice: we use the name defined in @register_factor
-factor = get_factor("illiq_guiji", lookback=60)
+factor = get_factor("illiq_guiji", lookback=20)
 
 # 3. Run
 result = factor.run(df)
