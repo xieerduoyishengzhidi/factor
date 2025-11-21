@@ -1,11 +1,13 @@
 # factor_evaluation/layer_backtest.py
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
 class LayerBacktester:
-    def __init__(self, cleaned_data, groups=5):
+    def __init__(self, cleaned_data, groups=5, factor_name='factor'):
         self.data = cleaned_data.copy()
         self.groups = groups
+        self.factor_name = factor_name
 
     def run(self):
         # 1. 每日分組
@@ -35,7 +37,7 @@ class LayerBacktester:
         
         return layer_ret
 
-    def plot_cumulative(self, layer_ret):
+    def plot_cumulative(self, layer_ret, save_path=None):
         # 計算累積收益 (使用單利累加近似，或者複利 (1+r).cumprod())
         # 為了看清楚趨勢，這裡用 log return 的累加比較科學，或者簡單單利累加
         cum_ret = layer_ret.cumsum()
@@ -50,8 +52,15 @@ class LayerBacktester:
         # 突出顯示多空曲線
         plt.plot(cum_ret.index, cum_ret['Long-Short'], label='Long-Short', color='black', linewidth=2.5)
 
-        plt.title(f"Layered Cumulative Return (Groups={self.groups})")
+        plt.title(f"Layered Cumulative Return - {self.factor_name} (Groups={self.groups})")
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
+        
+        # 保存图片
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"分层回测图已保存至: {save_path}")
+        
         plt.show()

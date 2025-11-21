@@ -2,10 +2,12 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 class ICAnalyzer:
-    def __init__(self, cleaned_data):
+    def __init__(self, cleaned_data, factor_name='factor'):
         self.data = cleaned_data
+        self.factor_name = factor_name
 
     def calculate_daily_ic(self, method='spearman', min_stocks=10):
         """
@@ -39,7 +41,7 @@ class ICAnalyzer:
             "Valid Days": self.ic_series.count()
         })
 
-    def plot_ic(self):
+    def plot_ic(self, save_path=None):
         if not hasattr(self, 'ic_series'):
             self.calculate_daily_ic()
             
@@ -52,7 +54,7 @@ class ICAnalyzer:
         plt.plot(ma_ic.index, ma_ic.values, color='orange', label='20D MA')
         
         plt.axhline(self.ic_series.mean(), color='red', linestyle='--', label=f'Mean: {self.ic_series.mean():.3f}')
-        plt.title("Factor Rank IC Series")
+        plt.title(f"Factor Rank IC Series - {self.factor_name}")
         
         # 因為 X 軸是日期，bar圖標籤會太密，簡化顯示
         ax = plt.gca()
@@ -61,4 +63,11 @@ class ICAnalyzer:
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.5)
         plt.tight_layout()
+        
+        # 保存图片
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"IC 分析图已保存至: {save_path}")
+        
         plt.show()
